@@ -41,7 +41,7 @@ from vtk.web import wslink as vtk_wslink
 from vtk.web import protocols as vtk_protocols
 
 import vtk
-from vtk_protocol import VtkCone
+from vtk_protocol import MPRViewer
 
 import logging
 
@@ -73,7 +73,7 @@ class _Server(vtk_wslink.ServerProtocol):
         self.registerVtkWebProtocol(vtk_protocols.vtkWebPublishImageDelivery(decode=False))
 
         # Custom API
-        self.registerVtkWebProtocol(VtkCone())
+        self.registerVtkWebProtocol(MPRViewer())
 
         # tell the C++ web app to use no encoding.
         # ParaViewWebPublishImageDelivery must be set to decode=False to match.
@@ -83,40 +83,11 @@ class _Server(vtk_wslink.ServerProtocol):
         self.updateSecret(_Server.authKey)
 
         if not _Server.view:
-            # coneRenderer = vtk.vtkRenderer()
-            # coneRenderWindow = vtk.vtkRenderWindow()
-            # coneRenderWindowInteractor = vtk.vtkRenderWindowInteractor()
-
-            # coneRenderWindow.AddRenderer(coneRenderer)
-            # coneRenderWindow.OffScreenRenderingOn()
-            # coneRenderWindowInteractor.SetRenderWindow(coneRenderWindow)
-            # coneRenderWindowInteractor.GetInteractorStyle().SetCurrentStyleToTrackballCamera()
-            # coneRenderWindowInteractor.EnableRenderOff()
-
-            # self.getApplication().GetObjectIdMap().SetActiveObject("VIEW", coneRenderWindow)
-            # globalId = self.getApplication().GetObjectIdMap().GetGlobalId(coneRenderWindow)
-            # logging.info(f"globalId of coneRenderWindow: {globalId}")
-
-            # sphereRenderer = vtk.vtkRenderer()
-            # sphereRenderWindow = vtk.vtkRenderWindow()
-            # sphereRenderWindowInteractor = vtk.vtkRenderWindowInteractor()
-
-            # sphereRenderWindow.AddRenderer(sphereRenderer)
-            # sphereRenderWindow.OffScreenRenderingOn()
-            # sphereRenderWindowInteractor.SetRenderWindow(sphereRenderWindow)
-            # sphereRenderWindowInteractor.GetInteractorStyle().SetCurrentStyleToTrackballCamera()
-            # sphereRenderWindowInteractor.EnableRenderOff()
-
-            # self.getApplication().GetObjectIdMap().SetActiveObject("SPHERE_VIEW", sphereRenderWindow)
-            # globalId = self.getApplication().GetObjectIdMap().GetGlobalId(sphereRenderWindow)
-            # logging.info(f"globalId of sphereRenderWindow: {globalId}")
-
             renderWindowAxial = vtk.vtkRenderWindow()
             renderWindowAxial.OffScreenRenderingOn()
             interactorStyleAxial = vtk.vtkInteractorStyleImage()
             interactorStyleAxial.SetInteractionModeToImageSlicing()
             renderWindowInteractorAxial = vtk.vtkRenderWindowInteractor()
-
             renderWindowInteractorAxial.SetInteractorStyle(interactorStyleAxial)
             renderWindowInteractorAxial.EnableRenderOff()
             renderWindowAxial.SetInteractor(renderWindowInteractorAxial)
@@ -128,7 +99,6 @@ class _Server(vtk_wslink.ServerProtocol):
             interactorStyleCoronal = vtk.vtkInteractorStyleImage()
             interactorStyleCoronal.SetInteractionModeToImageSlicing()
             renderWindowInteractorCoronal = vtk.vtkRenderWindowInteractor()
-
             renderWindowInteractorCoronal.SetInteractorStyle(interactorStyleCoronal)
             renderWindowInteractorCoronal.EnableRenderOff()
             renderWindowCoronal.SetInteractor(renderWindowInteractorCoronal)
@@ -140,7 +110,6 @@ class _Server(vtk_wslink.ServerProtocol):
             interactorStyleSagittal = vtk.vtkInteractorStyleImage()
             interactorStyleSagittal.SetInteractionModeToImageSlicing()
             renderWindowInteractorSagittal = vtk.vtkRenderWindowInteractor()
-
             renderWindowInteractorSagittal.SetInteractorStyle(interactorStyleSagittal)
             renderWindowInteractorSagittal.EnableRenderOff()
             renderWindowSagittal.SetInteractor(renderWindowInteractorSagittal)
