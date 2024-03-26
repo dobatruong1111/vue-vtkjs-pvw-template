@@ -41,7 +41,7 @@ from vtk.web import wslink as vtk_wslink
 from vtk.web import protocols as vtk_protocols
 
 import vtk
-from vtk_protocol import VtkCone
+from vtk_protocol import Viewer
 
 import logging
 
@@ -73,7 +73,7 @@ class _Server(vtk_wslink.ServerProtocol):
         self.registerVtkWebProtocol(vtk_protocols.vtkWebPublishImageDelivery(decode=False))
 
         # Custom API
-        self.registerVtkWebProtocol(VtkCone())
+        self.registerVtkWebProtocol(Viewer())
 
         # tell the C++ web app to use no encoding.
         # ParaViewWebPublishImageDelivery must be set to decode=False to match.
@@ -83,69 +83,58 @@ class _Server(vtk_wslink.ServerProtocol):
         self.updateSecret(_Server.authKey)
 
         if not _Server.view:
-            # coneRenderer = vtk.vtkRenderer()
-            # coneRenderWindow = vtk.vtkRenderWindow()
-            # coneRenderWindowInteractor = vtk.vtkRenderWindowInteractor()
-
-            # coneRenderWindow.AddRenderer(coneRenderer)
-            # coneRenderWindow.OffScreenRenderingOn()
-            # coneRenderWindowInteractor.SetRenderWindow(coneRenderWindow)
-            # coneRenderWindowInteractor.GetInteractorStyle().SetCurrentStyleToTrackballCamera()
-            # coneRenderWindowInteractor.EnableRenderOff()
-
-            # self.getApplication().GetObjectIdMap().SetActiveObject("VIEW", coneRenderWindow)
-            # globalId = self.getApplication().GetObjectIdMap().GetGlobalId(coneRenderWindow)
-            # logging.info(f"globalId of coneRenderWindow: {globalId}")
-
-            # sphereRenderer = vtk.vtkRenderer()
-            # sphereRenderWindow = vtk.vtkRenderWindow()
-            # sphereRenderWindowInteractor = vtk.vtkRenderWindowInteractor()
-
-            # sphereRenderWindow.AddRenderer(sphereRenderer)
-            # sphereRenderWindow.OffScreenRenderingOn()
-            # sphereRenderWindowInteractor.SetRenderWindow(sphereRenderWindow)
-            # sphereRenderWindowInteractor.GetInteractorStyle().SetCurrentStyleToTrackballCamera()
-            # sphereRenderWindowInteractor.EnableRenderOff()
-
-            # self.getApplication().GetObjectIdMap().SetActiveObject("SPHERE_VIEW", sphereRenderWindow)
-            # globalId = self.getApplication().GetObjectIdMap().GetGlobalId(sphereRenderWindow)
-            # logging.info(f"globalId of sphereRenderWindow: {globalId}")
-
-            renderWindowAxial = vtk.vtkRenderWindow()
-            renderWindowAxial.OffScreenRenderingOn()
-            interactorStyleAxial = vtk.vtkInteractorStyleImage()
-            interactorStyleAxial.SetInteractionModeToImageSlicing()
+            # Setup render window (Axial view - 3D MPR)
             renderWindowInteractorAxial = vtk.vtkRenderWindowInteractor()
+            interactorStyleAxial = vtk.vtkInteractorStyleImage()
+            renderWindowAxial = vtk.vtkRenderWindow()
 
+            interactorStyleAxial.SetInteractionModeToImageSlicing()
             renderWindowInteractorAxial.SetInteractorStyle(interactorStyleAxial)
             renderWindowInteractorAxial.EnableRenderOff()
+            
+            renderWindowAxial.OffScreenRenderingOn()
             renderWindowAxial.SetInteractor(renderWindowInteractorAxial)
-
             self.getApplication().GetObjectIdMap().SetActiveObject("AXIAL_VIEW", renderWindowAxial)
 
-            renderWindowCoronal = vtk.vtkRenderWindow()
-            renderWindowCoronal.OffScreenRenderingOn()
-            interactorStyleCoronal = vtk.vtkInteractorStyleImage()
-            interactorStyleCoronal.SetInteractionModeToImageSlicing()
+            # Setup render window (Coronal view - 3D MPR)
             renderWindowInteractorCoronal = vtk.vtkRenderWindowInteractor()
+            interactorStyleCoronal = vtk.vtkInteractorStyleImage()
+            renderWindowCoronal = vtk.vtkRenderWindow()
 
+            interactorStyleCoronal.SetInteractionModeToImageSlicing()
             renderWindowInteractorCoronal.SetInteractorStyle(interactorStyleCoronal)
             renderWindowInteractorCoronal.EnableRenderOff()
+            
+            renderWindowCoronal.OffScreenRenderingOn()
             renderWindowCoronal.SetInteractor(renderWindowInteractorCoronal)
-
             self.getApplication().GetObjectIdMap().SetActiveObject("CORONAL_VIEW", renderWindowCoronal)
 
-            renderWindowSagittal = vtk.vtkRenderWindow()
-            renderWindowSagittal.OffScreenRenderingOn()
-            interactorStyleSagittal = vtk.vtkInteractorStyleImage()
-            interactorStyleSagittal.SetInteractionModeToImageSlicing()
+            # Setup render window (Sagittal view - 3D MPR)
             renderWindowInteractorSagittal = vtk.vtkRenderWindowInteractor()
+            interactorStyleSagittal = vtk.vtkInteractorStyleImage()
+            renderWindowSagittal = vtk.vtkRenderWindow()
 
+            interactorStyleSagittal.SetInteractionModeToImageSlicing()
             renderWindowInteractorSagittal.SetInteractorStyle(interactorStyleSagittal)
             renderWindowInteractorSagittal.EnableRenderOff()
+            
+            renderWindowSagittal.OffScreenRenderingOn()
             renderWindowSagittal.SetInteractor(renderWindowInteractorSagittal)
-
             self.getApplication().GetObjectIdMap().SetActiveObject("SAGITTAL_VIEW", renderWindowSagittal)
+
+            # Setup render window (Volume rendering)
+            volumeRenderer = vtk.vtkRenderer()
+            renderWindowInteractorVolume = vtk.vtkRenderWindowInteractor()
+            interactorStyleVolume = vtk.vtkInteractorStyleTrackballCamera()
+            renderWindowVolume = vtk.vtkRenderWindow()
+
+            renderWindowInteractorVolume.SetInteractorStyle(interactorStyleVolume)
+            renderWindowInteractorVolume.EnableRenderOff()
+            
+            renderWindowVolume.AddRenderer(volumeRenderer)
+            renderWindowVolume.OffScreenRenderingOn()
+            renderWindowVolume.SetInteractor(renderWindowInteractorVolume)
+            self.getApplication().GetObjectIdMap().SetActiveObject("VOLUME_VIEW", renderWindowVolume)
 
 # =============================================================================
 # Main: Parse args and start serverviewId

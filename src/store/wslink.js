@@ -45,6 +45,9 @@ export default {
       if (location.port === '8080') {
         // We suppose that we have dev server and that ParaView/VTK is running on port 1234
         config.sessionURL = `ws://${location.hostname}:1234/ws`;
+        // config.sessionURL = `ws://222.252.29.141:9000/ws`;
+        // config.sessionURL = `ws://222.252.29.141:9091/ws`;
+        // config.sessionURL = `ws://192.168.1.35:1234/ws`;
       }
 
       const { client } = state;
