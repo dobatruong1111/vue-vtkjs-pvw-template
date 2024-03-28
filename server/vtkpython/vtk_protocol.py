@@ -1,5 +1,4 @@
 import math, logging, time
-import math, logging, time
 
 from wslink import register as exportRpc
 
@@ -9,60 +8,32 @@ from vtkmodules.vtkCommonCore import vtkCommand
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
+vtkmath = vtk.vtkMath()
+
 # -------------------------------------------------------------------------
 # ViewManager
 # -------------------------------------------------------------------------
 
-STANDARD = [
-    {
-        "name": 'air',
-        "range": [-1000],
-        "color": [[0, 0, 0]] # black
-    },
-    {
-        "name": 'lung',
-        "range": [-600, -400],
-        "color": [[194 / 255, 105 / 255, 82 / 255]]
-    },
-    {
-        "name": 'fat',
-        "range": [-100, -60],
-        "color": [[194 / 255, 166 / 255, 115 / 255]]
-    },
-    {
-        "name": 'soft tissue',
-        "range": [40, 80],
-        "color": [[102 / 255, 0, 0], [153 / 255, 0, 0]] # red
-    },
-    {
-        "name": 'bone',
-        "range": [400, 1000],
-        "color": [[255 / 255, 217 / 255, 163 / 255]] # ~ white
-    }
-]
-
-def to_rgb_points(colormap):
-    rgb_points = []
-    for item in colormap:
-        crange = item["range"]
-        color = item["color"]
-        for idx, r in enumerate(crange):
-            if len(color) == len(crange):
-                rgb_points.append([r] + color[idx])
-            else:
-                rgb_points.append([r] + color[0])
-    return rgb_points
+def calcAngleBetweenTwoVectors(A, B, C) -> float:
+    BA = [A[0] - B[0], A[1] - B[1], A[2] - B[2]]
+    BC = [C[0] - B[0], C[1] - B[1], C[2] - B[2]]
+    radianAngle = vtkmath.AngleBetweenVectors(BA, BC) # radian unit
+    degreeAngle = vtkmath.DegreesFromRadians(radianAngle) # degree unit
+    # BA x BC (Cross product)
+    crossProduct = [
+        BA[1] * BC[2] - BA[2] * BC[1],
+        BA[2] * BC[0] - BA[0] * BC[2],
+        BA[0] * BC[1] - BA[1] * BC[0]
+    ]
+    return degreeAngle if crossProduct[2] < 0 else -degreeAngle
 
 class Viewer(vtk_protocols.vtkWebProtocol):
     def __init__(self):
         self.dicomDirPath = "D:/workingspace/Python/dicom-data/220277460 Nguyen Thanh Dat"
         self.colors = vtk.vtkNamedColors()
-        self.vtkmath = vtk.vtkMath()
 
-        # Init volume
-        self.initializeVolume()
-        # Init 3D MPR
         self.initialize()
+
         self.initCenterlineAxialView()
         self.initCenterlineCoronalView()
         self.initCenterlineSagittalView()
@@ -74,36 +45,12 @@ class Viewer(vtk_protocols.vtkWebProtocol):
         # Used to save current position
         self.currentSphereWidgetCenter = None
         self.currentSphereWidgetCenterRotateLinesAxial = None
-    
-    def initializeVolume(self) -> None:
-        self.volumeMapper = vtk.vtkSmartVolumeMapper()
-        self.volumeProperty = vtk.vtkVolumeProperty()
-        self.scalarOpacity = vtk.vtkPiecewiseFunction()
-        self.colorTransferFunction = vtk.vtkColorTransferFunction()
-        self.volume = vtk.vtkVolume()
-    
-    def setVolumeLighting(self, ambientValue: float = 0.1, diffuseValue: float = 0.9, specularValue: float = 0.2) -> None:
-        self.volumeProperty.SetAmbient(ambientValue)
-        self.volumeProperty.SetDiffuse(diffuseValue)
-        self.volumeProperty.SetSpecular(specularValue)
-    
-    def volumeColorMapping(self) -> None:
-        rgb_points = to_rgb_points(STANDARD)
-        for rgb_point in rgb_points:
-            self.colorTransferFunction.AddRGBPoint(rgb_point[0], rgb_point[1], rgb_point[2], rgb_point[3])
-        self.volumeProperty.SetColor(self.colorTransferFunction)
-
-    def volumeScalarOpacityMapping(self) -> None:
-        self.scalarOpacity.AddPoint(184.129411764706, 0)
-        self.scalarOpacity.AddPoint(2271.070588235294, 1)
-        self.volumeProperty.SetScalarOpacity(self.scalarOpacity)
 
     def initialize(self) -> None:
         self.reader = vtk.vtkDICOMImageReader()
         self.axial = vtk.vtkMatrix4x4()
         self.coronal = vtk.vtkMatrix4x4()
         self.sagittal = vtk.vtkMatrix4x4()
-        self.rotationMatrix = vtk.vtkMatrix4x4()
         self.rotationMatrix = vtk.vtkMatrix4x4()
         self.resultMatrix = vtk.vtkMatrix4x4()
         self.resliceAxial = vtk.vtkImageReslice()
@@ -112,9 +59,6 @@ class Viewer(vtk_protocols.vtkWebProtocol):
         self.actorAxial = vtk.vtkImageActor()
         self.actorCoronal = vtk.vtkImageActor()
         self.actorSagittal = vtk.vtkImageActor()
-        self.cameraAxialView = vtk.vtkCamera()
-        self.cameraCoronalView = vtk.vtkCamera()
-        self.cameraSagittalView = vtk.vtkCamera()
         self.cameraAxialView = vtk.vtkCamera()
         self.cameraCoronalView = vtk.vtkCamera()
         self.cameraSagittalView = vtk.vtkCamera()
@@ -249,140 +193,7 @@ class Viewer(vtk_protocols.vtkWebProtocol):
         self.linesSagittalActor.SetOrigin(0, 0, 0)
 
     def initWidgetsAxialView(self) -> None:
-        self.rendererAxial.SetBackground(0.3, 0.1, 0.1)
-        self.rendererCoronal.SetBackground(0.1, 0.3, 0.1)
-        self.rendererSagittal.SetBackground(0.1, 0.1, 0.3)
-
-        # Initialize rotation matrix (y-axes)
-        self.rotationMatrix.DeepCopy(
-            (math.cos(math.radians(0)), 0, math.sin(math.radians(0)), 0, 
-            0, 1, 0, 0, 
-            -math.sin(math.radians(0)), 0, math.cos(math.radians(0)), 0, 
-            0, 0, 0, 1)
-        )
-
-    def initCenterlineAxialView(self) -> None:
-        greenLineAxial = vtk.vtkLineSource()
-        greenLineAxial.SetPoint1(0, 500, 0)
-        greenLineAxial.SetPoint2(0, -500, 0)
-        greenLineAxial.Update()
-
-        colorArray = vtk.vtkUnsignedCharArray()
-        colorArray.SetNumberOfComponents(3)
-        colorArray.SetNumberOfTuples(greenLineAxial.GetOutput().GetNumberOfCells())
-        for c in range(greenLineAxial.GetOutput().GetNumberOfCells()):
-            colorArray.SetTuple(c, [0, 255, 0])
-        greenLineAxial.GetOutput().GetCellData().SetScalars(colorArray)
-
-        blueLineAxial = vtk.vtkLineSource()
-        blueLineAxial.SetPoint1(-500, 0, 0)
-        blueLineAxial.SetPoint2(500, 0, 0)
-        blueLineAxial.Update()
-
-        colorArray = vtk.vtkUnsignedCharArray()
-        colorArray.SetNumberOfComponents(3)
-        colorArray.SetNumberOfTuples(blueLineAxial.GetOutput().GetNumberOfCells())
-        for c in range(blueLineAxial.GetOutput().GetNumberOfCells()):
-            colorArray.SetTuple(c, [0, 0, 255])
-        blueLineAxial.GetOutput().GetCellData().SetScalars(colorArray)
-
-        linesAxial = vtk.vtkAppendPolyData()
-        linesAxial.AddInputData(greenLineAxial.GetOutput())
-        linesAxial.AddInputData(blueLineAxial.GetOutput())
-        linesAxial.Update()
-
-        linesAxialMapper = vtk.vtkPolyDataMapper()
-        linesAxialMapper.SetInputConnection(linesAxial.GetOutputPort())
-
-        self.linesAxialActor = vtk.vtkActor()
-        self.linesAxialActor.SetMapper(linesAxialMapper)
-        self.linesAxialActor.GetProperty().SetLineWidth(1)
-        self.linesAxialActor.SetOrigin(0, 0, 0)
-        
-    def initCenterlineCoronalView(self) -> None:
-        greenLineCoronal = vtk.vtkLineSource()
-        greenLineCoronal.SetPoint1(0, 0, -500)
-        greenLineCoronal.SetPoint2(0, 0, 500)
-        greenLineCoronal.Update()
-
-        colorArray = vtk.vtkUnsignedCharArray()
-        colorArray.SetNumberOfComponents(3)
-        colorArray.SetNumberOfTuples(greenLineCoronal.GetOutput().GetNumberOfCells())
-        for c in range(greenLineCoronal.GetOutput().GetNumberOfCells()):
-            colorArray.SetTuple(c, [0, 255, 0])
-        greenLineCoronal.GetOutput().GetCellData().SetScalars(colorArray)
-
-        redLineCoronal = vtk.vtkLineSource()
-        redLineCoronal.SetPoint1(-500, 0, 0)
-        redLineCoronal.SetPoint2(500, 0, 0)
-        redLineCoronal.Update()
-
-        colorArray = vtk.vtkUnsignedCharArray()
-        colorArray.SetNumberOfComponents(3)
-        colorArray.SetNumberOfTuples(redLineCoronal.GetOutput().GetNumberOfCells())
-        for c in range(redLineCoronal.GetOutput().GetNumberOfCells()):
-            colorArray.SetTuple(c, [255, 0, 0])
-        redLineCoronal.GetOutput().GetCellData().SetScalars(colorArray)
-
-        linesCoronal = vtk.vtkAppendPolyData()
-        linesCoronal.AddInputData(greenLineCoronal.GetOutput())
-        linesCoronal.AddInputData(redLineCoronal.GetOutput())
-        linesCoronal.Update()
-
-        linesCoronalMapper = vtk.vtkPolyDataMapper()
-        linesCoronalMapper.SetInputConnection(linesCoronal.GetOutputPort())
-
-        self.linesCoronalActor = vtk.vtkActor()
-        self.linesCoronalActor.SetMapper(linesCoronalMapper)
-        self.linesCoronalActor.GetProperty().SetLineWidth(1)
-        self.linesCoronalActor.SetOrigin(0, 0, 0)
-
-    def initCenterlineSagittalView(self) -> None:
-        blueLineSagittal = vtk.vtkLineSource()
-        blueLineSagittal.SetPoint1(0, 0, -500)
-        blueLineSagittal.SetPoint2(0, 0, 500)
-        blueLineSagittal.Update()
-
-        colorArray = vtk.vtkUnsignedCharArray()
-        colorArray.SetNumberOfComponents(3)
-        colorArray.SetNumberOfTuples(blueLineSagittal.GetOutput().GetNumberOfCells())
-        for c in range(blueLineSagittal.GetOutput().GetNumberOfCells()):
-            colorArray.SetTuple(c, [0, 0, 255])
-        blueLineSagittal.GetOutput().GetCellData().SetScalars(colorArray)
-
-        redLineSagittal = vtk.vtkLineSource()
-        redLineSagittal.SetPoint1(0, -500, 0)
-        redLineSagittal.SetPoint2(0, 500, 0)
-        redLineSagittal.Update()
-
-        colorArray = vtk.vtkUnsignedCharArray()
-        colorArray.SetNumberOfComponents(3)
-        colorArray.SetNumberOfTuples(redLineSagittal.GetOutput().GetNumberOfCells())
-        for c in range(redLineSagittal.GetOutput().GetNumberOfCells()):
-            colorArray.SetTuple(c, [255, 0, 0])
-        redLineSagittal.GetOutput().GetCellData().SetScalars(colorArray)
-
-        linesSagittal = vtk.vtkAppendPolyData()
-        linesSagittal.AddInputData(blueLineSagittal.GetOutput())
-        linesSagittal.AddInputData(redLineSagittal.GetOutput())
-        linesSagittal.Update()
-
-        linesSagittalMapper = vtk.vtkPolyDataMapper()
-        linesSagittalMapper.SetInputConnection(linesSagittal.GetOutputPort())
-
-        self.linesSagittalActor = vtk.vtkActor()
-        self.linesSagittalActor.SetMapper(linesSagittalMapper)
-        self.linesSagittalActor.GetProperty().SetLineWidth(1)
-        self.linesSagittalActor.SetOrigin(0, 0, 0)
-
-    def initWidgetsAxialView(self) -> None:
         self.sphereWidgetAxial = vtk.vtkSphereWidget()
-        self.sphereWidgetAxial.SetRadius(8)
-        self.sphereWidgetAxial.SetRepresentationToSurface()
-        self.sphereWidgetAxial.GetSphereProperty().SetColor(self.colors.GetColor3d("Tomato"))
-        self.sphereWidgetAxial.GetSelectedSphereProperty().SetOpacity(0)
-        self.sphereWidgetAxial.SetCurrentRenderer(self.rendererAxial)
-
         self.sphereWidgetAxial.SetRadius(8)
         self.sphereWidgetAxial.SetRepresentationToSurface()
         self.sphereWidgetAxial.GetSphereProperty().SetColor(self.colors.GetColor3d("Tomato"))
@@ -395,13 +206,7 @@ class Viewer(vtk_protocols.vtkWebProtocol):
         self.sphereWidgetInteractionRotateGreenLineAxial.GetSphereProperty().SetColor(self.colors.GetColor3d("green"))
         self.sphereWidgetInteractionRotateGreenLineAxial.GetSelectedSphereProperty().SetOpacity(0)
         self.sphereWidgetInteractionRotateGreenLineAxial.SetCurrentRenderer(self.rendererAxial)
-        self.sphereWidgetInteractionRotateGreenLineAxial.SetRadius(6)
-        self.sphereWidgetInteractionRotateGreenLineAxial.SetRepresentationToSurface()
-        self.sphereWidgetInteractionRotateGreenLineAxial.GetSphereProperty().SetColor(self.colors.GetColor3d("green"))
-        self.sphereWidgetInteractionRotateGreenLineAxial.GetSelectedSphereProperty().SetOpacity(0)
-        self.sphereWidgetInteractionRotateGreenLineAxial.SetCurrentRenderer(self.rendererAxial)
 
-    def initWidgetsCoronalView(self) -> None:
     def initWidgetsCoronalView(self) -> None:
         self.sphereWidgetCoronal = vtk.vtkSphereWidget()
         self.sphereWidgetCoronal.SetRadius(8)
@@ -409,13 +214,7 @@ class Viewer(vtk_protocols.vtkWebProtocol):
         self.sphereWidgetCoronal.GetSphereProperty().SetColor(self.colors.GetColor3d("Tomato"))
         self.sphereWidgetCoronal.GetSelectedSphereProperty().SetOpacity(0)
         self.sphereWidgetCoronal.SetCurrentRenderer(self.rendererCoronal)
-        self.sphereWidgetCoronal.SetRadius(8)
-        self.sphereWidgetCoronal.SetRepresentationToSurface()
-        self.sphereWidgetCoronal.GetSphereProperty().SetColor(self.colors.GetColor3d("Tomato"))
-        self.sphereWidgetCoronal.GetSelectedSphereProperty().SetOpacity(0)
-        self.sphereWidgetCoronal.SetCurrentRenderer(self.rendererCoronal)
 
-    def initWidgetsSagittalView(self) -> None:
     def initWidgetsSagittalView(self) -> None:
         self.sphereWidgetSagittal = vtk.vtkSphereWidget()
         self.sphereWidgetSagittal.SetRadius(8)
@@ -436,29 +235,7 @@ class Viewer(vtk_protocols.vtkWebProtocol):
         self.sphereWidgetCoronal.Off()
         self.sphereWidgetSagittal.Off()
 
-    def createVolumeVisualization(self, imageData: vtk.vtkImageData) -> None:
-        renderWindow = self.getApplication().GetObjectIdMap().GetActiveObject("VOLUME_VIEW")
-
-        self.volumeMapper.SetInputData(imageData)
-
-        self.volumeProperty.ShadeOn()
-        self.volumeProperty.SetScalarOpacityUnitDistance(0.1)
-        self.volumeProperty.SetInterpolationTypeToLinear()
-
-        self.setVolumeLighting()
-        self.volumeColorMapping()
-        self.volumeScalarOpacityMapping()
-
-        self.volume.SetMapper(self.volumeMapper)
-        self.volume.SetProperty(self.volumeProperty)
-
-        renderWindow.GetRenderers().GetFirstRenderer().AddVolume(self.volume)
-        renderWindow.Render()
-
-        self.getApplication().InvalidateCache(renderWindow)
-    
     @exportRpc("vtk.initialize")
-    def createVisualization(self) -> None:
     def createVisualization(self) -> None:
         renderWindowAxial = self.getApplication().GetObjectIdMap().GetActiveObject("AXIAL_VIEW")
         renderWindowInteractorAxial = renderWindowAxial.GetInteractor()
@@ -466,7 +243,6 @@ class Viewer(vtk_protocols.vtkWebProtocol):
         renderWindowInteractorCoronal = renderWindowCoronal.GetInteractor()
         renderWindowSagittal = self.getApplication().GetObjectIdMap().GetActiveObject("SAGITTAL_VIEW")
         renderWindowInteractorSagittal = renderWindowSagittal.GetInteractor()
-        
         
         # Reader
         self.reader.SetDirectoryName(self.dicomDirPath)
@@ -562,15 +338,19 @@ class Viewer(vtk_protocols.vtkWebProtocol):
         self.cameraSagittalView.SetThickness(3.5*xMax)
         self.rendererSagittal.SetActiveCamera(self.cameraSagittalView)
 
-        # Add renderers into render window
+        # Add renderer object into render window object
         renderWindowAxial.AddRenderer(self.rendererAxial)
-        # renderWindowCoronal.AddRenderer(self.rendererCoronal)
-        # renderWindowSagittal.AddRenderer(self.rendererSagittal)
+        renderWindowCoronal.AddRenderer(self.rendererCoronal)
+        renderWindowSagittal.AddRenderer(self.rendererSagittal)
 
-        # Set position of lines in views
+        # Set lines in axial view
         self.linesAxialActor.SetPosition(center)
         self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter(center[0], (yMax + center[1])/2, center[2])
+
+        # Set lines in coronal view
         self.linesCoronalActor.SetPosition(center)
+
+        # Set lines in sagittal view
         self.linesSagittalActor.SetPosition(center)
 
         # Create callback function for sphere widget interaction
@@ -582,31 +362,30 @@ class Viewer(vtk_protocols.vtkWebProtocol):
         self.currentSphereWidgetCenterRotateLinesAxial = {
             "green": self.sphereWidgetInteractionRotateGreenLineAxial.GetCenter()
         }
+
         def interactionEventHandleTranslateLines_AxialView(obj, event) -> None:
             newPosition = obj.GetCenter()
             translationInterval = [newPosition[i] - self.currentSphereWidgetCenter["axial"][i] for i in range(3)]
 
             # Translate lines in axial view
             self.linesAxialActor.SetPosition(newPosition)
-            self.linesAxialActor.SetPosition(newPosition)
             # Translate a rotation point on green line in axial view
-            self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
             self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
             self.currentSphereWidgetCenterRotateLinesAxial["green"] = self.sphereWidgetInteractionRotateGreenLineAxial.GetCenter()
 
-            # self.resliceSagittal.GetResliceAxes().SetElement(0, 3, newPosition[0])
-            # self.resliceSagittal.GetResliceAxes().SetElement(1, 3, newPosition[1])
-            # self.resliceSagittal.GetResliceAxes().SetElement(2, 3, newPosition[2])
+            self.resliceSagittal.GetResliceAxes().SetElement(0, 3, newPosition[0])
+            self.resliceSagittal.GetResliceAxes().SetElement(1, 3, newPosition[1])
+            self.resliceSagittal.GetResliceAxes().SetElement(2, 3, newPosition[2])
             # Translate sphere widget in sagittal view
-            # self.sphereWidgetSagittal.SetCenter(newPosition)
+            self.sphereWidgetSagittal.SetCenter(newPosition)
             # Translate lines in sagital view
             self.linesSagittalActor.SetPosition(newPosition)
 
-            # self.resliceCoronal.GetResliceAxes().SetElement(0, 3, newPosition[0])
-            # self.resliceCoronal.GetResliceAxes().SetElement(1, 3, newPosition[1])
-            # self.resliceCoronal.GetResliceAxes().SetElement(2, 3, newPosition[2])
+            self.resliceCoronal.GetResliceAxes().SetElement(0, 3, newPosition[0])
+            self.resliceCoronal.GetResliceAxes().SetElement(1, 3, newPosition[1])
+            self.resliceCoronal.GetResliceAxes().SetElement(2, 3, newPosition[2])
             # Translate sphere widget in coronal view
-            # self.sphereWidgetCoronal.SetCenter(newPosition)
+            self.sphereWidgetCoronal.SetCenter(newPosition)
             # Translate lines in coronal view
             self.linesCoronalActor.SetPosition(newPosition)
 
@@ -614,17 +393,15 @@ class Viewer(vtk_protocols.vtkWebProtocol):
             self.currentSphereWidgetCenter["sagittal"] = newPosition
             self.currentSphereWidgetCenter["coronal"] = newPosition
             
-            
             renderWindowAxial.Render()
-            # renderWindowCoronal.Render()
-            # renderWindowSagittal.Render()
+            renderWindowCoronal.Render()
+            renderWindowSagittal.Render()
 
         def interactionEventHandleTranslateLines_CoronalView(obj, event) -> None:
             newPosition = obj.GetCenter()
             translationInterval = [newPosition[i] - self.currentSphereWidgetCenter["coronal"][i] for i in range(3)]
 
             # Translate lines in coronal view
-            self.linesCoronalActor.SetPosition(newPosition)
             self.linesCoronalActor.SetPosition(newPosition)
 
             self.resliceAxial.GetResliceAxes().SetElement(0, 3, newPosition[0])
@@ -634,9 +411,7 @@ class Viewer(vtk_protocols.vtkWebProtocol):
             self.sphereWidgetAxial.SetCenter(newPosition)
             # Translate lines in axial view
             self.linesAxialActor.SetPosition(newPosition)
-            self.linesAxialActor.SetPosition(newPosition)
             # Translate a rotation point on green line in axial view
-            self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
             self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
             self.currentSphereWidgetCenterRotateLinesAxial["green"] = self.sphereWidgetInteractionRotateGreenLineAxial.GetCenter()
 
@@ -647,12 +422,10 @@ class Viewer(vtk_protocols.vtkWebProtocol):
             self.sphereWidgetSagittal.SetCenter(newPosition)
             # Translate lines in sagittal view
             self.linesSagittalActor.SetPosition(newPosition)
-            self.linesSagittalActor.SetPosition(newPosition)
 
             self.currentSphereWidgetCenter["axial"] = newPosition
             self.currentSphereWidgetCenter["sagittal"] = newPosition
             self.currentSphereWidgetCenter["coronal"] = newPosition
-
 
             renderWindowAxial.Render()
             renderWindowCoronal.Render()
@@ -664,7 +437,6 @@ class Viewer(vtk_protocols.vtkWebProtocol):
 
             # Translate lines in sagittal view
             self.linesSagittalActor.SetPosition(newPosition)
-            self.linesSagittalActor.SetPosition(newPosition)
 
             self.resliceAxial.GetResliceAxes().SetElement(0, 3, newPosition[0])
             self.resliceAxial.GetResliceAxes().SetElement(1, 3, newPosition[1])
@@ -673,9 +445,7 @@ class Viewer(vtk_protocols.vtkWebProtocol):
             self.sphereWidgetAxial.SetCenter(newPosition)
             # Translate lines in axial view
             self.linesAxialActor.SetPosition(newPosition)
-            self.linesAxialActor.SetPosition(newPosition)
             # Translate a rotation point on green line in axial view
-            self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
             self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
             self.currentSphereWidgetCenterRotateLinesAxial["green"] = self.sphereWidgetInteractionRotateGreenLineAxial.GetCenter()
 
@@ -686,26 +456,22 @@ class Viewer(vtk_protocols.vtkWebProtocol):
             self.sphereWidgetCoronal.SetCenter(newPosition)
             # Translate lines in coronal view
             self.linesCoronalActor.SetPosition(newPosition)
-            self.linesCoronalActor.SetPosition(newPosition)
 
             self.currentSphereWidgetCenter["axial"] = newPosition
-            self.currentSphereWidgetCenter["coronal"] = newPosition
             self.currentSphereWidgetCenter["sagittal"] = newPosition
+            self.currentSphereWidgetCenter["coronal"] = newPosition
 
             renderWindowAxial.Render()
             renderWindowCoronal.Render()
             renderWindowSagittal.Render()
 
         def interactionEventHandleRotateGreenLine_AxialView(obj, event) -> None:
-            # start = time.time()
+            start = time.time()
             newPosition = obj.GetCenter()
             # Calculate rotation angle (degree unit)
-            v1 = [self.currentSphereWidgetCenterRotateLinesAxial["green"][i] - self.currentSphereWidgetCenter["axial"][i] for i in range(3)]
-            v2 = [newPosition[i] - self.currentSphereWidgetCenter["axial"][i] for i in range(3)]
-            angle = self.vtkmath.DegreesFromRadians(self.vtkmath.SignedAngleBetweenVectors(v1, v2, [0, 0, -1]))
+            angle = calcAngleBetweenTwoVectors(self.currentSphereWidgetCenterRotateLinesAxial["green"], self.currentSphereWidgetCenter["axial"], newPosition)
 
             # Rotate lines in axial view
-            self.linesAxialActor.RotateZ(-angle)
             self.linesAxialActor.RotateZ(-angle)
 
             # Create rotate matrix (y-axes)
@@ -732,31 +498,28 @@ class Viewer(vtk_protocols.vtkWebProtocol):
 
             self.currentSphereWidgetCenterRotateLinesAxial["green"] = newPosition
 
-
             renderWindowAxial.Render()
             renderWindowCoronal.Render()
             renderWindowSagittal.Render()
-            # stop = time.time()
+            stop = time.time()
             # logging.info(f"total rotation time: {stop - start}, rotation angle: {angle}")
         
         self.sphereWidgetAxial.AddObserver(vtkCommand.InteractionEvent, interactionEventHandleTranslateLines_AxialView)
         self.sphereWidgetInteractionRotateGreenLineAxial.AddObserver(vtkCommand.InteractionEvent, interactionEventHandleRotateGreenLine_AxialView)
-        # self.sphereWidgetCoronal.AddObserver(vtkCommand.InteractionEvent, interactionEventHandleTranslateLines_CoronalView)
-        # self.sphereWidgetSagittal.AddObserver(vtkCommand.InteractionEvent, interactionEventHandleTranslateLines_SagittalView)
+        self.sphereWidgetCoronal.AddObserver(vtkCommand.InteractionEvent, interactionEventHandleTranslateLines_CoronalView)
+        self.sphereWidgetSagittal.AddObserver(vtkCommand.InteractionEvent, interactionEventHandleTranslateLines_SagittalView)
 
         # Turn on sphere widget
-        self.turnOnWidgets()
         self.turnOnWidgets()
 
         renderWindowAxial.Render()
         renderWindowCoronal.Render()
         renderWindowSagittal.Render()
 
-        self.createVolumeVisualization(imageData)
-
         self.getApplication().InvalidateCache(renderWindowAxial)
-        # self.getApplication().InvalidateCache(renderWindowCoronal)
-        # self.getApplication().InvalidateCache(renderWindowSagittal)
+        self.getApplication().InvalidateCache(renderWindowCoronal)
+        self.getApplication().InvalidateCache(renderWindowSagittal)
+
         self.getApplication().InvokeEvent(vtkCommand.UpdateEvent)
 
     @exportRpc("viewport.mouse.zoom.wheel")
@@ -768,7 +531,6 @@ class Viewer(vtk_protocols.vtkWebProtocol):
         # MouseWheelBackwardEvent: event["spinY"] > 0
         viewId = int(event.get("view"))
         # Axial view
-        if viewId == 1:
         if viewId == 1:
             sliceSpacing = self.resliceAxial.GetOutput().GetSpacing()[2]
             cameraPosition = self.rendererAxial.GetActiveCamera().GetPosition()
@@ -787,10 +549,8 @@ class Viewer(vtk_protocols.vtkWebProtocol):
                 self.sphereWidgetAxial.SetCenter(newPosition)
                 # Translate lines in axial view
                 self.linesAxialActor.SetPosition(newPosition)
-                self.linesAxialActor.SetPosition(newPosition)
                 # Translate a rotation point on green line in axial view
                 translationInterval = [newPosition[i] - self.currentSphereWidgetCenter["axial"][i] for i in range(3)]
-                self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
                 self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
                 self.currentSphereWidgetCenterRotateLinesAxial["green"] = self.sphereWidgetInteractionRotateGreenLineAxial.GetCenter()
 
@@ -798,12 +558,10 @@ class Viewer(vtk_protocols.vtkWebProtocol):
                 self.sphereWidgetCoronal.SetCenter(newPosition)
                 # Translate lines in coronal view
                 self.linesCoronalActor.SetPosition(newPosition)
-                self.linesCoronalActor.SetPosition(newPosition)
 
                 # Translate sphere widget in sagittal view
                 self.sphereWidgetSagittal.SetCenter(newPosition)
                 # Translate lines in sagittal view
-                self.linesSagittalActor.SetPosition(newPosition)
                 self.linesSagittalActor.SetPosition(newPosition)
             elif "spinY" in event and event.get("spinY") and event.get("spinY") > 0:
                 # move the center point that we are slicing through
@@ -819,10 +577,8 @@ class Viewer(vtk_protocols.vtkWebProtocol):
                 self.sphereWidgetAxial.SetCenter(newPosition)
                 # Translate lines in axial view
                 self.linesAxialActor.SetPosition(newPosition)
-                self.linesAxialActor.SetPosition(newPosition)
                 # Translate a rotation point on green line in axial view
                 translationInterval = [newPosition[i] - self.currentSphereWidgetCenter["axial"][i] for i in range(3)]
-                self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
                 self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
                 self.currentSphereWidgetCenterRotateLinesAxial["green"] = self.sphereWidgetInteractionRotateGreenLineAxial.GetCenter()
 
@@ -830,12 +586,10 @@ class Viewer(vtk_protocols.vtkWebProtocol):
                 self.sphereWidgetCoronal.SetCenter(newPosition)
                 # Translate lines in coronal view
                 self.linesCoronalActor.SetPosition(newPosition)
-                self.linesCoronalActor.SetPosition(newPosition)
 
                 # Translate sphere widget in sagittal view
                 self.sphereWidgetSagittal.SetCenter(newPosition)
                 # Translate lines in sagittal view
-                self.linesSagittalActor.SetPosition(newPosition)
                 self.linesSagittalActor.SetPosition(newPosition)
         # Coronal view
         elif viewId == 2:
@@ -856,23 +610,19 @@ class Viewer(vtk_protocols.vtkWebProtocol):
                 self.sphereWidgetCoronal.SetCenter(newPosition)
                 # Translate lines in coronal view
                 self.linesCoronalActor.SetPosition(newPosition)
-                self.linesCoronalActor.SetPosition(newPosition)
                 
                 # Translate sphere widget in axial view
                 self.sphereWidgetAxial.SetCenter(newPosition)
                 # Translate lines in axial view
                 self.linesAxialActor.SetPosition(newPosition)
-                self.linesAxialActor.SetPosition(newPosition)
                 # Translate a rotation point on green line in axial view
                 translationInterval = [newPosition[i] - self.currentSphereWidgetCenter["axial"][i] for i in range(3)]
-                self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
                 self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
                 self.currentSphereWidgetCenterRotateLinesAxial["green"] = self.sphereWidgetInteractionRotateGreenLineAxial.GetCenter()
 
                 # Translate sphere widget in sagittal view
                 self.sphereWidgetSagittal.SetCenter(newPosition)
                 # Translate lines in sagittal view
-                self.linesSagittalActor.SetPosition(newPosition)
                 self.linesSagittalActor.SetPosition(newPosition)
             elif "spinY" in event and event["spinY"] and event["spinY"] > 0:
                 # move the center point that we are slicing through
@@ -888,23 +638,19 @@ class Viewer(vtk_protocols.vtkWebProtocol):
                 self.sphereWidgetCoronal.SetCenter(newPosition)
                 # Translate lines in coronal view
                 self.linesCoronalActor.SetPosition(newPosition)
-                self.linesCoronalActor.SetPosition(newPosition)
                 
                 # Translate sphere widget in axial view
                 self.sphereWidgetAxial.SetCenter(newPosition)
                 # Translate lines in axial view
                 self.linesAxialActor.SetPosition(newPosition)
-                self.linesAxialActor.SetPosition(newPosition)
                 # Translate a rotation point on green line in axial view
                 translationInterval = [newPosition[i] - self.currentSphereWidgetCenter["axial"][i] for i in range(3)]
-                self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
                 self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
                 self.currentSphereWidgetCenterRotateLinesAxial["green"] = self.sphereWidgetInteractionRotateGreenLineAxial.GetCenter()
 
                 # Translate sphere widget in sagittal view
                 self.sphereWidgetSagittal.SetCenter(newPosition)
                 # Translate lines in sagittal view
-                self.linesSagittalActor.SetPosition(newPosition)
                 self.linesSagittalActor.SetPosition(newPosition)
         # Sagittal view
         elif viewId == 3:
@@ -925,23 +671,19 @@ class Viewer(vtk_protocols.vtkWebProtocol):
                 self.sphereWidgetSagittal.SetCenter(newPosition)
                 # Translate lines in sagittal view
                 self.linesSagittalActor.SetPosition(newPosition)
-                self.linesSagittalActor.SetPosition(newPosition)
 
                 # Translate sphere widget in axial view
                 self.sphereWidgetAxial.SetCenter(newPosition)
                 # Translate lines in axial view
                 self.linesAxialActor.SetPosition(newPosition)
-                self.linesAxialActor.SetPosition(newPosition)
                 # Translate a rotation point on green line in axial view
                 translationInterval = [newPosition[i] - self.currentSphereWidgetCenter["axial"][i] for i in range(3)]
-                self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
                 self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
                 self.currentSphereWidgetCenterRotateLinesAxial["green"] = self.sphereWidgetInteractionRotateGreenLineAxial.GetCenter()
 
                 # Translate sphere widget in coronal view
                 self.sphereWidgetCoronal.SetCenter(newPosition)
                 # Translate lines in coronal view
-                self.linesCoronalActor.SetPosition(newPosition)
                 self.linesCoronalActor.SetPosition(newPosition)
             elif "spinY" in event and event["spinY"] and event["spinY"] > 0:
                 # move the center point that we are slicing through
@@ -957,23 +699,19 @@ class Viewer(vtk_protocols.vtkWebProtocol):
                 self.sphereWidgetSagittal.SetCenter(newPosition)
                 # Translate lines in sagittal view
                 self.linesSagittalActor.SetPosition(newPosition)
-                self.linesSagittalActor.SetPosition(newPosition)
 
                 # Translate sphere widget in axial view
                 self.sphereWidgetAxial.SetCenter(newPosition)
                 # Translate lines in axial view
                 self.linesAxialActor.SetPosition(newPosition)
-                self.linesAxialActor.SetPosition(newPosition)
                 # Translate a rotation point on green line in axial view
                 translationInterval = [newPosition[i] - self.currentSphereWidgetCenter["axial"][i] for i in range(3)]
-                self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
                 self.sphereWidgetInteractionRotateGreenLineAxial.SetCenter([self.currentSphereWidgetCenterRotateLinesAxial["green"][i] + translationInterval[i] for i in range(3)])
                 self.currentSphereWidgetCenterRotateLinesAxial["green"] = self.sphereWidgetInteractionRotateGreenLineAxial.GetCenter()
 
                 # Translate sphere widget in coronal view
                 self.sphereWidgetCoronal.SetCenter(newPosition)
                 # Translate lines in coronal view
-                self.linesCoronalActor.SetPosition(newPosition)
                 self.linesCoronalActor.SetPosition(newPosition)
 
         self.currentSphereWidgetCenter["axial"] = self.sphereWidgetAxial.GetCenter()
@@ -986,23 +724,6 @@ class Viewer(vtk_protocols.vtkWebProtocol):
 
         if 'End' in event["type"]:
             self.getApplication().InvokeEvent(vtkCommand.EndInteractionEvent)
-
-    @exportRpc("vtk.camera.reset")
-    def resetCamera(self):
-        renderWindow = self.getApplication().GetObjectIdMap().GetActiveObject("VIEW")
-        renderWindow.GetRenderers().GetFirstRenderer().ResetCamera()
-        renderWindow.Render()
-        self.getApplication().InvalidateCache(renderWindow)
-        self.getApplication().InvokeEvent('UpdateEvent')
-
-    @exportRpc("vtk.cone.resolution.update")
-    def updateResolution(self, resolution):
-        self.cone.SetResolution(resolution)
-        renderWindow = self.getView('-1')
-        # renderWindow.Modified() # either modified or render
-        renderWindow.Render()
-        self.getApplication().InvokeEvent('UpdateEvent')
-
 
     @exportRpc("vtk.camera.reset")
     def resetCamera(self):
