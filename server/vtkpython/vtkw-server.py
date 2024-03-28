@@ -83,7 +83,7 @@ class _Server(vtk_wslink.ServerProtocol):
         self.updateSecret(_Server.authKey)
 
         if not _Server.view:
-            # Setup render window (Axial view - 3D MPR)
+            # Setup render window (axial view - 3D MPR)
             renderWindowInteractorAxial = vtk.vtkRenderWindowInteractor()
             interactorStyleAxial = vtk.vtkInteractorStyleImage()
             renderWindowAxial = vtk.vtkRenderWindow()
@@ -96,7 +96,7 @@ class _Server(vtk_wslink.ServerProtocol):
             renderWindowAxial.SetInteractor(renderWindowInteractorAxial)
             self.getApplication().GetObjectIdMap().SetActiveObject("AXIAL_VIEW", renderWindowAxial)
 
-            # Setup render window (Coronal view - 3D MPR)
+            # Setup render window (coronal view - 3D MPR)
             renderWindowInteractorCoronal = vtk.vtkRenderWindowInteractor()
             interactorStyleCoronal = vtk.vtkInteractorStyleImage()
             renderWindowCoronal = vtk.vtkRenderWindow()
@@ -109,7 +109,7 @@ class _Server(vtk_wslink.ServerProtocol):
             renderWindowCoronal.SetInteractor(renderWindowInteractorCoronal)
             self.getApplication().GetObjectIdMap().SetActiveObject("CORONAL_VIEW", renderWindowCoronal)
 
-            # Setup render window (Sagittal view - 3D MPR)
+            # Setup render window (sagittal view - 3D MPR)
             renderWindowInteractorSagittal = vtk.vtkRenderWindowInteractor()
             interactorStyleSagittal = vtk.vtkInteractorStyleImage()
             renderWindowSagittal = vtk.vtkRenderWindow()
@@ -121,20 +121,6 @@ class _Server(vtk_wslink.ServerProtocol):
             renderWindowSagittal.OffScreenRenderingOn()
             renderWindowSagittal.SetInteractor(renderWindowInteractorSagittal)
             self.getApplication().GetObjectIdMap().SetActiveObject("SAGITTAL_VIEW", renderWindowSagittal)
-
-            # Setup render window (Volume rendering)
-            # volumeRenderer = vtk.vtkRenderer()
-            # renderWindowInteractorVolume = vtk.vtkRenderWindowInteractor()
-            # interactorStyleVolume = vtk.vtkInteractorStyleTrackballCamera()
-            # renderWindowVolume = vtk.vtkRenderWindow()
-
-            # renderWindowInteractorVolume.SetInteractorStyle(interactorStyleVolume)
-            # renderWindowInteractorVolume.EnableRenderOff()
-            
-            # renderWindowVolume.AddRenderer(volumeRenderer)
-            # renderWindowVolume.OffScreenRenderingOn()
-            # renderWindowVolume.SetInteractor(renderWindowInteractorVolume)
-            # self.getApplication().GetObjectIdMap().SetActiveObject("VOLUME_VIEW", renderWindowVolume)
 
 # =============================================================================
 # Main: Parse args and start serverviewId
