@@ -9,7 +9,7 @@ import RemoteRenderingView from 'vue-vtkjs-pvw-template/src/components/widgets/R
 export default {
   name: 'App',
   components: {
-    RemoteRenderingView
+    RemoteRenderingView,
   },
   data() {
     return {

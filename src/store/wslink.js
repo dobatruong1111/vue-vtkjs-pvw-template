@@ -40,12 +40,13 @@ export default {
     WS_CONNECT({ state, commit, dispatch }) {
       // Initiate network connection
       const config = { application: 'cone' };
+      config.sessionURL = `ws://${location.hostname}:9000/ws`;
 
       // Custom setup for development (http:8080 / ws:1234)
-      if (location.port === '8080') {
-        // We suppose that we have dev server and that ParaView/VTK is running on port 1234
-        config.sessionURL = `ws://${location.hostname}:1234/ws`;
-      }
+      // if (location.port === '8080') {
+      // We suppose that we have dev server and that ParaView/VTK is running on port 1234
+      // config.sessionURL = `ws://${location.hostname}:1234/ws`;
+      // }
 
       const { client } = state;
       if (client && client.isConnected()) {

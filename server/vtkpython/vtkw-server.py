@@ -41,7 +41,7 @@ from vtk.web import wslink as vtk_wslink
 from vtk.web import protocols as vtk_protocols
 
 import vtk
-from vtk_protocol import MPRViewer
+from vtk_protocol import Viewer
 
 import logging
 
@@ -73,7 +73,7 @@ class _Server(vtk_wslink.ServerProtocol):
         self.registerVtkWebProtocol(vtk_protocols.vtkWebPublishImageDelivery(decode=False))
 
         # Custom API
-        self.registerVtkWebProtocol(MPRViewer())
+        self.registerVtkWebProtocol(Viewer())
 
         # tell the C++ web app to use no encoding.
         # ParaViewWebPublishImageDelivery must be set to decode=False to match.
@@ -83,38 +83,16 @@ class _Server(vtk_wslink.ServerProtocol):
         self.updateSecret(_Server.authKey)
 
         if not _Server.view:
-            renderWindowAxial = vtk.vtkRenderWindow()
-            renderWindowAxial.OffScreenRenderingOn()
-            interactorStyleAxial = vtk.vtkInteractorStyleImage()
-            interactorStyleAxial.SetInteractionModeToImageSlicing()
-            renderWindowInteractorAxial = vtk.vtkRenderWindowInteractor()
-            renderWindowInteractorAxial.SetInteractorStyle(interactorStyleAxial)
-            renderWindowInteractorAxial.EnableRenderOff()
-            renderWindowAxial.SetInteractor(renderWindowInteractorAxial)
+            renderWindow = vtk.vtkRenderWindow()
+            renderWindow.OffScreenRenderingOn()
+            interactorStyle = vtk.vtkInteractorStyleImage()
+            interactorStyle.SetInteractionModeToImageSlicing()
+            renderWindowInteractor = vtk.vtkRenderWindowInteractor()
+            renderWindowInteractor.SetInteractorStyle(interactorStyle)
+            renderWindowInteractor.EnableRenderOff()
+            renderWindow.SetInteractor(renderWindowInteractor)
 
-            self.getApplication().GetObjectIdMap().SetActiveObject("AXIAL_VIEW", renderWindowAxial)
-
-            renderWindowCoronal = vtk.vtkRenderWindow()
-            renderWindowCoronal.OffScreenRenderingOn()
-            interactorStyleCoronal = vtk.vtkInteractorStyleImage()
-            interactorStyleCoronal.SetInteractionModeToImageSlicing()
-            renderWindowInteractorCoronal = vtk.vtkRenderWindowInteractor()
-            renderWindowInteractorCoronal.SetInteractorStyle(interactorStyleCoronal)
-            renderWindowInteractorCoronal.EnableRenderOff()
-            renderWindowCoronal.SetInteractor(renderWindowInteractorCoronal)
-
-            self.getApplication().GetObjectIdMap().SetActiveObject("CORONAL_VIEW", renderWindowCoronal)
-
-            renderWindowSagittal = vtk.vtkRenderWindow()
-            renderWindowSagittal.OffScreenRenderingOn()
-            interactorStyleSagittal = vtk.vtkInteractorStyleImage()
-            interactorStyleSagittal.SetInteractionModeToImageSlicing()
-            renderWindowInteractorSagittal = vtk.vtkRenderWindowInteractor()
-            renderWindowInteractorSagittal.SetInteractorStyle(interactorStyleSagittal)
-            renderWindowInteractorSagittal.EnableRenderOff()
-            renderWindowSagittal.SetInteractor(renderWindowInteractorSagittal)
-
-            self.getApplication().GetObjectIdMap().SetActiveObject("SAGITTAL_VIEW", renderWindowSagittal)
+            self.getApplication().GetObjectIdMap().SetActiveObject("VIEW", renderWindow)
 
 # =============================================================================
 # Main: Parse args and start serverviewId
