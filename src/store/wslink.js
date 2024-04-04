@@ -40,7 +40,9 @@ export default {
     WS_CONNECT({ state, commit, dispatch }) {
       // Initiate network connection
       const config = { application: 'cone' };
-      config.sessionURL = `ws://${location.hostname}:8000/ws`;
+      config.sessionURL = `ws://${location.hostname}:1234/ws`;
+      // config.sessionURL = `ws://${location.hostname}:8000/ws`;
+      // config.sessionURL = `ws://222.252.29.141:9000/ws`;
 
       // Custom setup for development (http:8080 / ws:1234)
       // if (location.port === '8080') {

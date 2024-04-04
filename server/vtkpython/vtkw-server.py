@@ -122,20 +122,6 @@ class _Server(vtk_wslink.ServerProtocol):
             renderWindowSagittal.SetInteractor(renderWindowInteractorSagittal)
             self.getApplication().GetObjectIdMap().SetActiveObject("SAGITTAL_VIEW", renderWindowSagittal)
 
-            # Setup render window (Volume rendering)
-            # volumeRenderer = vtk.vtkRenderer()
-            # renderWindowInteractorVolume = vtk.vtkRenderWindowInteractor()
-            # interactorStyleVolume = vtk.vtkInteractorStyleTrackballCamera()
-            # renderWindowVolume = vtk.vtkRenderWindow()
-
-            # renderWindowInteractorVolume.SetInteractorStyle(interactorStyleVolume)
-            # renderWindowInteractorVolume.EnableRenderOff()
-            
-            # renderWindowVolume.AddRenderer(volumeRenderer)
-            # renderWindowVolume.OffScreenRenderingOn()
-            # renderWindowVolume.SetInteractor(renderWindowInteractorVolume)
-            # self.getApplication().GetObjectIdMap().SetActiveObject("VOLUME_VIEW", renderWindowVolume)
-
 # =============================================================================
 # Main: Parse args and start serverviewId
 # =============================================================================

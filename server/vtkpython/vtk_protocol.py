@@ -29,7 +29,7 @@ def calcAngleBetweenTwoVectors(A, B, C) -> float:
 
 class Viewer(vtk_protocols.vtkWebProtocol):
     def __init__(self):
-        self.dicomDirPath = "D:/workingspace/Python/dicom-data/220277460 Nguyen Thanh Dat"
+        self.dicomDirPath = "./dicom_data/220277460 Nguyen Thanh Dat"
         self.colors = vtk.vtkNamedColors()
 
         self.initialize()
