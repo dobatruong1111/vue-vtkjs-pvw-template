@@ -238,12 +238,9 @@ class Viewer(vtk_protocols.vtkWebProtocol):
     @exportRpc("vtk.initialize")
     def createVisualization(self) -> None:
         renderWindowAxial = self.getApplication().GetObjectIdMap().GetActiveObject("AXIAL_VIEW")
-        renderWindowInteractorAxial = renderWindowAxial.GetInteractor()
         renderWindowCoronal = self.getApplication().GetObjectIdMap().GetActiveObject("CORONAL_VIEW")
-        renderWindowInteractorCoronal = renderWindowCoronal.GetInteractor()
         renderWindowSagittal = self.getApplication().GetObjectIdMap().GetActiveObject("SAGITTAL_VIEW")
-        renderWindowInteractorSagittal = renderWindowSagittal.GetInteractor()
-        
+
         # Reader
         self.reader.SetDirectoryName(self.dicomDirPath)
         self.reader.Update()
@@ -253,16 +250,16 @@ class Viewer(vtk_protocols.vtkWebProtocol):
 
         # Setup widgets in axial view
         self.sphereWidgetAxial.SetCenter(center)
-        self.sphereWidgetAxial.SetInteractor(renderWindowInteractorAxial)
-        self.sphereWidgetInteractionRotateGreenLineAxial.SetInteractor(renderWindowInteractorAxial)
+        self.sphereWidgetAxial.SetInteractor(renderWindowAxial.GetInteractor())
+        self.sphereWidgetInteractionRotateGreenLineAxial.SetInteractor(renderWindowAxial.GetInteractor())
 
         # Setup widgets in coronal view
         self.sphereWidgetCoronal.SetCenter(center)
-        self.sphereWidgetCoronal.SetInteractor(renderWindowInteractorCoronal)
+        self.sphereWidgetCoronal.SetInteractor(renderWindowCoronal.GetInteractor())
 
         # Setup widgets in sagittal view
         self.sphereWidgetSagittal.SetCenter(center)
-        self.sphereWidgetSagittal.SetInteractor(renderWindowInteractorSagittal)
+        self.sphereWidgetSagittal.SetInteractor(renderWindowSagittal.GetInteractor())
 
         # Matrices for axial, coronal, and sagittal view orientations
         # Model matrix = Translation matrix
@@ -362,7 +359,6 @@ class Viewer(vtk_protocols.vtkWebProtocol):
         self.currentSphereWidgetCenterRotateLinesAxial = {
             "green": self.sphereWidgetInteractionRotateGreenLineAxial.GetCenter()
         }
-
         def interactionEventHandleTranslateLines_AxialView(obj, event) -> None:
             newPosition = obj.GetCenter()
             translationInterval = [newPosition[i] - self.currentSphereWidgetCenter["axial"][i] for i in range(3)]
@@ -466,7 +462,6 @@ class Viewer(vtk_protocols.vtkWebProtocol):
             renderWindowSagittal.Render()
 
         def interactionEventHandleRotateGreenLine_AxialView(obj, event) -> None:
-            start = time.time()
             newPosition = obj.GetCenter()
             # Calculate rotation angle (degree unit)
             angle = calcAngleBetweenTwoVectors(self.currentSphereWidgetCenterRotateLinesAxial["green"], self.currentSphereWidgetCenter["axial"], newPosition)
@@ -501,8 +496,6 @@ class Viewer(vtk_protocols.vtkWebProtocol):
             renderWindowAxial.Render()
             renderWindowCoronal.Render()
             renderWindowSagittal.Render()
-            stop = time.time()
-            # logging.info(f"total rotation time: {stop - start}, rotation angle: {angle}")
         
         self.sphereWidgetAxial.AddObserver(vtkCommand.InteractionEvent, interactionEventHandleTranslateLines_AxialView)
         self.sphereWidgetInteractionRotateGreenLineAxial.AddObserver(vtkCommand.InteractionEvent, interactionEventHandleRotateGreenLine_AxialView)
@@ -530,6 +523,7 @@ class Viewer(vtk_protocols.vtkWebProtocol):
         # MouseWheelForwardEvent: event["spinY"] < 0
         # MouseWheelBackwardEvent: event["spinY"] > 0
         viewId = int(event.get("view"))
+        
         # Axial view
         if viewId == 1:
             sliceSpacing = self.resliceAxial.GetOutput().GetSpacing()[2]
